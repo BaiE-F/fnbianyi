@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple
 
 
 @dataclass
 class Program:
-    statements: List[Stmt]
+    functions: List["FuncDecl"] = field(default_factory=list)
+    statements: List["Stmt"] = field(default_factory=list)
 
 
 class Stmt:
@@ -16,37 +17,88 @@ class Stmt:
 
 
 @dataclass
+class FuncDecl(Stmt):
+    return_type: str
+    name: str
+    params: List[Tuple[str, str]]
+    body: "Block"
+    line: int = 0
+
+
+@dataclass
 class DeclStmt(Stmt):
     type_name: str
     name: str
+    array_size: Optional[int] = None
     line: int = 0
 
 
 @dataclass
 class AssignStmt(Stmt):
     name: str
-    value: Expr
+    value: "Expr"
+    index: Optional["Expr"] = None
     line: int = 0
 
 
 @dataclass
 class IfStmt(Stmt):
-    condition: Expr
-    then_block: Block
-    else_block: Optional[Block] = None
+    condition: "Expr"
+    then_block: "Block"
+    else_block: Optional["Block"] = None
     line: int = 0
 
 
 @dataclass
 class WhileStmt(Stmt):
-    condition: Expr
-    body: Block
+    condition: "Expr"
+    body: "Block"
+    line: int = 0
+
+
+@dataclass
+class ForStmt(Stmt):
+    init: Optional[AssignStmt]
+    condition: "Expr"
+    update: Optional[AssignStmt]
+    body: "Block"
+    line: int = 0
+
+
+@dataclass
+class ReturnStmt(Stmt):
+    value: Optional["Expr"]
+    line: int = 0
+
+
+@dataclass
+class BreakStmt(Stmt):
+    line: int = 0
+
+
+@dataclass
+class ContinueStmt(Stmt):
+    line: int = 0
+
+
+@dataclass
+class InputStmt(Stmt):
+    name: str
+    prompt: Optional[Expr] = None
+    type_name: str = "int"
+    line: int = 0
+
+
+@dataclass
+class WriteStmt(Stmt):
+    path: Expr
+    value: Expr
     line: int = 0
 
 
 @dataclass
 class PrintStmt(Stmt):
-    value: Expr
+    value: "Expr"
     line: int = 0
 
 
@@ -76,8 +128,30 @@ class FloatLit(Expr):
 
 
 @dataclass
+class StringLit(Expr):
+    value: str
+
+    def __post_init__(self):
+        self.type_name = "string"
+
+
+@dataclass
 class VarExpr(Expr):
     name: str
+    type_name: str = "unknown"
+
+
+@dataclass
+class ArrayAccessExpr(Expr):
+    name: str
+    index: Expr
+    type_name: str = "unknown"
+
+
+@dataclass
+class CallExpr(Expr):
+    name: str
+    args: List[Expr] = field(default_factory=list)
     type_name: str = "unknown"
 
 

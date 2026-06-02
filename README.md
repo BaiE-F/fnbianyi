@@ -38,46 +38,92 @@ if (x > 10) {
 }
 ```
 
-支持：`int` / `float` 变量声明、`+ - * /` 算术、比较运算、`if-else`、`while`、`print`。
+## 快速开始（桌面编辑器）
 
-## 快速开始
-
-需要 Python 3.10+。
+需要 Python 3.10+，**无需安装额外依赖**（使用内置 Tkinter）。
 
 ```bash
-# 编译并运行示例
-python -m compiler.main examples/hello.ml --run
+python -m compiler.main
+```
+
+在编辑器里：
+1. 编写 MiniLang 代码（默认 `workspace/main.ml`）
+2. **编译并运行**（`F5`）— 运行时会弹窗 `input` 读入
+3. `print` 输出显示在下方，`write` 写入 `workspace/output/`
+4. **Ctrl+S** 保存，**打开输出目录** 查看生成文件
+
+支持：`int` / `float` / `string`、`input`、`print`、`write`、`string[i]` 字符访问、`len(s)` 长度、数组（栈/队列等基础结构）、函数、循环。
+
+### 语言速查（写算法常用）
+
+| 能力 | 写法 |
+|------|------|
+| 字符串读入 | `input(s, "提示: ");` |
+| 取字符 | `ch = s[i];` |
+| 长度 | `n = len(s);` |
+| 栈（数组模拟） | `int stack[256];` + `top` 指针 |
+| 字符串拼接 | `s = s + "x";` |
+| 写文件 | `write("out.txt", x);` → `workspace/output/` |
+
+括号匹配示例思路：`input` 读整串 → `while (i < len(s))` → `s[i]` 与 `(` `[` `{` 比较 → `int stack[]` 压弹栈。
+
+
+```c
+// 递归函数
+int fib(int n) {
+    if (n <= 1) {
+        return n;
+    }
+    return fib(n - 1) + fib(n - 2);
+}
+
+// 数组 + for + break
+int data[5];
+int total;
+int i;
+for (i = 0; i < 5; i = i + 1) {
+    data[i] = (i + 1) * 10;
+}
+total = 0;
+for (i = 0; i < 5; i = i + 1) {
+    total = total + data[i];
+    if (total > 100) {
+        break;
+    }
+}
+
+// 字符串与逻辑运算
+string msg;
+msg = "Hello MiniLang";
+if (score >= 60 && score <= 100) {
+    print(msg);
+}
+```
+
+### 命令行（可选）
+
+```bash
+# 编译并运行指定文件（终端内 input 从键盘读入）
+python -m compiler.main workspace/main.ml --run
 
 # 查看完整编译过程
 python -m compiler.main examples/factorial.ml --dump all --run
-
-# 指定输出文件
-python -m compiler.main examples/if_else.ml -o out.py --run
 ```
 
 ## 项目结构
 
 ```
 fnbianyi/
+├── editor/gui.py            # 桌面代码编辑器（主入口）
+├── workspace/               # 用户编写代码的工作区
+│   ├── main.ml              # 默认源文件
+│   └── output/              # write() 输出目录
 ├── grammar/                 # 语法规则库
-│   ├── tokens.json          # 词法规则（关键字、运算符、正则）
-│   └── grammar.json         # BNF 产生式
-├── compiler/
-│   ├── lexer.py             # 词法分析
-│   ├── parser.py            # 语法分析
-│   ├── ast_nodes.py         # AST 节点
-│   ├── semantic.py          # 语义分析
-│   ├── tac.py               # 中间代码生成
-│   ├── optimizer.py         # 优化
-│   ├── codegen.py           # 目标代码生成
-│   ├── compiler.py          # 流水线调度
-│   └── main.py              # 命令行入口
-└── examples/                # 示例程序
-    ├── hello.ml
-    ├── factorial.ml
-    ├── if_else.ml
-    └── float_calc.ml
+├── compiler/                # 编译器各阶段
+└── examples/                # 参考示例（可选）
 ```
+
+> Web 版仍保留在 `web/` 目录，运行 `python -m compiler.main --web` 或 `python -m web.app`，访问 http://127.0.0.1:5000。**与桌面版同步**：空白工作区、`input`/`write`、`string[i]`、`len()`、运行输入框、保存到 `workspace/main.ml`。
 
 ## 与参考项目的对应关系
 

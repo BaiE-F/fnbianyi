@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from .compiler import Compiler
+from .runtime import runtime_globals
 
 
 def _print_stage(title: str) -> None:
@@ -19,9 +20,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="MiniLang 编译器 — 词法/语法/语义分析 → 中间代码 → 优化 → 目标代码"
     )
-    parser.add_argument("source", help="MiniLang 源文件 (.ml)")
+    parser.add_argument("source", nargs="?", help="MiniLang 源文件 (.ml)")
     parser.add_argument("-o", "--output", help="输出目标代码文件路径")
-    parser.add_argument("--run", action="store_true", help="编译并运行生成的目标代码")
+    parser.add_argument("--run", action="store_true", help="编译并运行")
+    parser.add_argument("--web", action="store_true", help="启动 Web 界面")
+    parser.add_argument("--gui", action="store_true", help="启动桌面代码编辑器")
     parser.add_argument("--no-opt", action="store_true", help="跳过优化阶段")
     parser.add_argument(
         "--dump",
@@ -30,16 +33,30 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    if args.gui or (not args.source and not args.web):
+        from editor.gui import main as gui_main
+        gui_main()
+        return 0
+
+    if args.web:
+        from web.app import main as web_main
+        web_main()
+        return 0
+
     src_path = Path(args.source)
     if not src_path.exists():
         print(f"错误: 文件不存在 {src_path}", file=sys.stderr)
         return 1
 
     compiler = Compiler()
-    result = compiler.compile_file(src_path, optimize=not args.no_opt)
+    result = compiler.compile_file(src_path, optimize=not args.no_opt, run=args.run)
 
     if not result.success:
-        print(f"编译失败:\n{result.errors[0]}", file=sys.stderr)
+        print("编译失败:", file=sys.stderr)
+        for err in result.errors:
+            print(f"  {err}", file=sys.stderr)
+        for warn in result.warnings:
+            print(f"  {warn}", file=sys.stderr)
         return 1
 
     if args.dump:
@@ -65,7 +82,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.run:
         print("\n--- 程序输出 ---")
-        exec(compile(result.target_code, str(out_path), "exec"), {"__name__": "__main__"})
+        globs = {"__name__": "__main__"}
+        globs.update(runtime_globals())
+        exec(compile(result.target_code, str(out_path), "exec"), globs)
 
     return 0
 

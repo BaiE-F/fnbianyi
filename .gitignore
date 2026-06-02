@@ -1,4 +1,8 @@
-_ref/
 __pycache__/
 *.py[cod]
 examples/*.py
+workspace/*.py
+workspace/output/*
+!workspace/main.ml
+!workspace/README.txt
+_ref/
