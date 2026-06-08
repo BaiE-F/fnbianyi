@@ -83,10 +83,14 @@ class ContinueStmt(Stmt):
 
 @dataclass
 class InputStmt(Stmt):
-    name: str
+    names: List[str]
     prompt: Optional[Expr] = None
-    type_name: str = "int"
+    type_names: List[str] = field(default_factory=list)
     line: int = 0
+
+    @property
+    def name(self) -> str:
+        return self.names[0] if self.names else ""
 
 
 @dataclass
@@ -98,7 +102,8 @@ class WriteStmt(Stmt):
 
 @dataclass
 class PrintStmt(Stmt):
-    value: "Expr"
+    values: List["Expr"]
+    newline: bool = True
     line: int = 0
 
 

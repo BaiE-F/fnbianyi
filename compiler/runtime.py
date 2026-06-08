@@ -44,6 +44,23 @@ def ml_input(prompt: str = "") -> str:
     return sys.stdin.readline().rstrip("\n\r")
 
 
+def ml_split_line(raw: str) -> list[str]:
+    return raw.split()
+
+
+def ml_getint(line: str, index: int) -> int:
+    parts = ml_split_line(line.strip())
+    if index < 0 or index >= len(parts):
+        return 0
+    try:
+        return int(parts[index])
+    except ValueError:
+        try:
+            return int(float(parts[index]))
+        except ValueError:
+            return 0
+
+
 def ml_write(path: str, content: str) -> None:
     ensure_dirs()
     p = Path(path)
@@ -60,4 +77,6 @@ def runtime_globals() -> dict:
     return {
         "_ml_input": ml_input,
         "_ml_write": ml_write,
+        "_ml_split_line": ml_split_line,
+        "_ml_getint": ml_getint,
     }

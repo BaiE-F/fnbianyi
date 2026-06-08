@@ -1,64 +1,42 @@
-string s;
 int n;
+int x;
 int i;
-int top;
-int stack[256];
-string ch;
-int ok;
-int expect;
+int j;
+int row_sum;
+int total;
+int t;
+string line;
 
-print("输入括号串:");
-input(s, "> ");
+print("请输入行数 n 和每行个数 x（空格分隔）:");
+input(n, x, "> ");
 
-n = len(s);
-top = 0;
+total = 0;
 i = 0;
-ok = 1;
-
 while (i < n) {
-    ch = s[i];
-    if (ch == "(") {
-        stack[top] = 1;
-        top = top + 1;
-    } else {
-        if (ch == "[") {
-            stack[top] = 2;
-            top = top + 1;
-        } else {
-            if (ch == "{") {
-                stack[top] = 3;
-                top = top + 1;
-            } else {
-                if (ch == ")") {
-                    top = top - 1;
-                    if (top < 0) { ok = 0; break; }
-                    expect = stack[top];
-                    if (expect != 1) { ok = 0; break; }
-                } else {
-                    if (ch == "]") {
-                        top = top - 1;
-                        if (top < 0) { ok = 0; break; }
-                        expect = stack[top];
-                        if (expect != 2) { ok = 0; break; }
-                    } else {
-                        if (ch == "}") {
-                            top = top - 1;
-                            if (top < 0) { ok = 0; break; }
-                            expect = stack[top];
-                            if (expect != 3) { ok = 0; break; }
-                        }
-                    }
-                }
-            }
-        }
+    print("请输入第",i+1,"行数据");
+    
+    input(line, "> ");
+
+    row_sum = 0;
+    j = 0;
+    while (j < x) {
+        t = getint(line, j);
+        row_sum = row_sum + t;
+        j = j + 1;
     }
+    print("本行之和:");
+    print(row_sum);
+
+    total = total + row_sum;
     i = i + 1;
 }
 
-if (ok == 1 && top == 0 {
-    print("匹配");
-} else {
-    print("不匹配");
-}
+print("总和:");
+print(total);
+
+
+
+
+
 
 

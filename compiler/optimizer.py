@@ -104,7 +104,7 @@ class Optimizer:
     def _dead_code_elimination(self, instrs: List[TACInstr]) -> List[TACInstr]:
         used: Set[str] = set()
         for ins in reversed(instrs):
-            if ins.op == "print":
+            if ins.op in ("print", "printn"):
                 used.add(ins.arg1)
             elif ins.op == "ifFalse":
                 used.add(ins.arg1)
@@ -125,7 +125,7 @@ class Optimizer:
         for ins in instrs:
             if ins.op == "assign" and ins.result and not re.match(r"^t\d+$", ins.result):
                 used_vars.add(ins.result)
-            if ins.op == "print":
+            if ins.op in ("print", "printn"):
                 used_vars.add(ins.arg1)
             if ins.op == "ifFalse":
                 used_vars.add(ins.arg1)

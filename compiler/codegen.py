@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Dict, List, Optional, Set, Union
 
@@ -39,7 +40,8 @@ class CodeGenerator:
     def generate(self, program: Program, tac: TACProgram) -> str:
         lines = [
             "# MiniLang 编译器生成的目标代码 (Python)",
-            "from compiler.runtime import ml_input as _ml_input, ml_write as _ml_write",
+            "from compiler.runtime import ml_input as _ml_input, ml_write as _ml_write, "
+            "ml_split_line as _ml_split_line, ml_getint as _ml_getint",
             "_vars = {}",
             "",
         ]
@@ -124,12 +126,21 @@ class CodeGenerator:
                 return [f"{pad}{base}[int({idx})] = {val}"]
             return [f"{pad}{self._var_ref(stmt.name, params, locals_set)} = {val}"]
         if isinstance(stmt, PrintStmt):
-            return [f"{pad}print({self._gen_expr_ast(stmt.value, params, locals_set)})"]
+            parts = ", ".join(
+                self._gen_expr_ast(v, params, locals_set) for v in stmt.values
+            )
+            if stmt.newline:
+                return [f"{pad}print({parts})"]
+            return [f"{pad}print({parts}, end=\"\")"]
         if isinstance(stmt, InputStmt):
             prompt = self._gen_expr_ast(stmt.prompt, params, locals_set) if stmt.prompt else '""'
-            var = self._var_ref(stmt.name, params, locals_set)
             pad = " " * (4 * indent)
-            return [f"{pad}{line}" for line in self._gen_input_lines(var, prompt, stmt.type_name)]
+            refs = [self._var_ref(n, params, locals_set) for n in stmt.names]
+            types = stmt.type_names or ["int"] * len(stmt.names)
+            return [
+                f"{pad}{line}"
+                for line in self._gen_multi_input_lines(refs, types, prompt)
+            ]
         if isinstance(stmt, WriteStmt):
             path = self._gen_expr_ast(stmt.path, params, locals_set)
             val = self._gen_expr_ast(stmt.value, params, locals_set)
@@ -186,7 +197,7 @@ class CodeGenerator:
         if isinstance(expr, FloatLit):
             return str(expr.value)
         if isinstance(expr, StringLit):
-            return repr(expr.value)
+            return json.dumps(expr.value, ensure_ascii=False)
         if isinstance(expr, VarExpr):
             return self._var_ref(expr.name, params, locals_set)
         if isinstance(expr, ArrayAccessExpr):
@@ -197,6 +208,10 @@ class CodeGenerator:
             if expr.name == "len":
                 args = ", ".join(self._gen_expr_ast(a, params, locals_set) for a in expr.args)
                 return f"len({args})"
+            if expr.name == "getint":
+                line = self._gen_expr_ast(expr.args[0], params, locals_set)
+                idx = self._gen_expr_ast(expr.args[1], params, locals_set)
+                return f"_ml_getint(str({line}), int({idx}))"
             args = ", ".join(self._gen_expr_ast(a, params, locals_set) for a in expr.args)
             return f"_ml_{expr.name}({args})"
         if isinstance(expr, UnaryExpr):
@@ -276,7 +291,7 @@ class CodeGenerator:
             elem = "0.0" if ins.arg2 == "float" else "0"
             return [f"_vars[{ins.result!r}] = [{elem}] * {ins.arg1}"]
         if ins.op == "assign":
-            if ins.arg1.startswith('"') and ins.arg1.endswith('"'):
+            if ins.arg1.startswith(('"', "'")):
                 return [f"_vars[{ins.result!r}] = {ins.arg1}"]
             return [f"_vars[{ins.result!r}] = {self._ref(ins.arg1)}"]
         if ins.op == "array_set":
@@ -287,6 +302,11 @@ class CodeGenerator:
             if ins.arg1 == "len":
                 arg = ins.arg2.split(",")[0].strip() if ins.arg2 else ""
                 return [f"_vars[{ins.result!r}] = len({self._ref(arg)})"]
+            if ins.arg1 == "getint":
+                args = ins.arg2.split(",") if ins.arg2 else []
+                line = self._ref(args[0].strip()) if args else '""'
+                idx = self._ref(args[1].strip()) if len(args) > 1 else "0"
+                return [f"_vars[{ins.result!r}] = _ml_getint(str({line}), int({idx}))"]
             args = ins.arg2.split(",") if ins.arg2 else []
             call_args = ", ".join(self._ref(a.strip()) for a in args if a.strip())
             return [f"_vars[{ins.result!r}] = _ml_{ins.arg1}({call_args})"]
@@ -301,11 +321,25 @@ class CodeGenerator:
             return [f"_vars[{ins.result!r}] = -{self._ref(ins.arg1)}"]
         if ins.op == "not":
             return [f"_vars[{ins.result!r}] = int(not {self._ref(ins.arg1)})"]
-        if ins.op == "print":
-            return [f"print({self._ref(ins.arg1)})"]
+        if ins.op in ("print", "printn"):
+            parts = ", ".join(
+                self._ref(p.strip()) for p in ins.arg1.split(",") if p.strip()
+            )
+            if ins.op == "printn":
+                return [f"print({parts}, end=\"\")"]
+            return [f"print({parts})"]
         if ins.op == "input":
-            var = f"_vars[{ins.result!r}]"
-            return self._gen_input_lines(var, self._ref(ins.arg1), ins.arg2 or "int")
+            names = [n.strip() for n in ins.result.split(",") if n.strip()]
+            types = [t.strip() for t in (ins.arg2 or "int").split(",")]
+            while len(types) < len(names):
+                types.append("int")
+            refs = [f"_vars[{n!r}]" for n in names]
+            return self._gen_multi_input_lines(refs, types, self._ref(ins.arg1))
+        if ins.op == "call" and ins.arg1 == "getint":
+            args = ins.arg2.split(",") if ins.arg2 else []
+            line = self._ref(args[0].strip()) if args else '""'
+            idx = self._ref(args[1].strip()) if len(args) > 1 else "0"
+            return [f"_vars[{ins.result!r}] = _ml_getint(str({line}), int({idx}))"]
         if ins.op == "write":
             return [f"_ml_write(str({self._ref(ins.arg1)}), str({self._ref(ins.arg2)}))"]
         if ins.op == "goto":
@@ -316,27 +350,40 @@ class CodeGenerator:
 
     @staticmethod
     def _gen_input_lines(var: str, prompt_expr: str, type_name: str) -> List[str]:
+        return CodeGenerator._gen_multi_input_lines([var], [type_name], prompt_expr)
+
+    @staticmethod
+    def _gen_multi_input_lines(
+        vars: List[str], type_names: List[str], prompt_expr: str
+    ) -> List[str]:
         lines = [f"_raw = _ml_input(str({prompt_expr})).strip()"]
+        if len(vars) == 1:
+            return lines + CodeGenerator._assign_from_part(vars[0], "_raw", type_names[0])
+        lines.append("_parts = _ml_split_line(_raw)")
+        for i, (var, tn) in enumerate(zip(vars, type_names)):
+            lines.extend(CodeGenerator._assign_from_part(var, f"_parts[{i}] if {i} < len(_parts) else ''", tn))
+        return lines
+
+    @staticmethod
+    def _assign_from_part(var: str, part_expr: str, type_name: str) -> List[str]:
         if type_name == "string":
-            lines.append(f"{var} = _raw")
-        elif type_name == "float":
-            lines.extend([
+            return [f"{var} = str({part_expr})"]
+        if type_name == "float":
+            return [
                 f"try:",
-                f"    {var} = float(_raw)",
+                f"    {var} = float({part_expr})",
                 f"except ValueError:",
                 f"    {var} = 0.0",
-            ])
-        else:
-            lines.extend([
-                f"try:",
-                f"    {var} = int(_raw)",
-                f"except ValueError:",
-                f"    try:",
-                f"        {var} = int(float(_raw))",
-                f"    except ValueError:",
-                f"        {var} = 0",
-            ])
-        return lines
+            ]
+        return [
+            f"try:",
+            f"    {var} = int({part_expr})",
+            f"except ValueError:",
+            f"    try:",
+            f"        {var} = int(float({part_expr}))",
+            f"    except ValueError:",
+            f"        {var} = 0",
+        ]
 
     @staticmethod
     def _default(type_name: str) -> str:

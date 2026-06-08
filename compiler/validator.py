@@ -7,7 +7,7 @@ from typing import List, Set
 from .errors import CompileDiagnostic, Severity, Stage, diagnostic
 from .lexer import Token
 
-STMT_START = {"INT", "FLOAT", "IF", "WHILE", "PRINT", "IDENT", "LBRACE", "RBRACE"}
+STMT_START = {"INT", "FLOAT", "IF", "WHILE", "PRINT", "PRINTN", "IDENT", "LBRACE", "RBRACE"}
 
 
 class StaticValidator:
@@ -100,7 +100,7 @@ class StaticValidator:
 
     def _check_tokens(self, tokens: List[Token]) -> List[CompileDiagnostic]:
         diags: List[CompileDiagnostic] = []
-        keywords = {"int", "float", "if", "else", "while", "print", "return"}
+        keywords = {"int", "float", "if", "else", "while", "print", "printn", "return"}
 
         for i, tok in enumerate(tokens):
             if tok.kind == "ERROR":
@@ -146,7 +146,7 @@ class StaticValidator:
                         continue
                     if cur.kind == "IDENT" and nxt.kind == "LBRACKET":
                         continue
-                    if cur.kind == "RBRACE" and nxt.kind in ("IDENT", "INT", "FLOAT", "STRING", "IF", "WHILE", "FOR", "PRINT"):
+                    if cur.kind == "RBRACE" and nxt.kind in ("IDENT", "INT", "FLOAT", "STRING", "IF", "WHILE", "FOR", "PRINT", "PRINTN"):
                         continue
                     diags.append(
                         diagnostic(
@@ -226,14 +226,18 @@ class StaticValidator:
                 depth += 1
             elif tok.kind in ("RPAREN", "RBRACE"):
                 depth = max(0, depth - 1)
-            if depth > 0 or tok.kind not in ("IDENT", "INT_LIT", "FLOAT_LIT", "RPAREN", "RBRACE", "STRING_LIT"):
+            if depth > 0 or tok.kind not in ("IDENT", "INT_LIT", "FLOAT_LIT", "RPAREN", "STRING_LIT"):
+                continue
+            if tok.kind == "RBRACE":
                 continue
             j = i + 1
             while j < len(tokens) and tokens[j].kind in (
                 "PLUS", "MINUS", "STAR", "SLASH", "IDENT", "INT_LIT", "FLOAT_LIT",
-                "LPAREN", "RPAREN", "LBRACKET", "RBRACKET", "STRING_LIT",
+                "LPAREN", "RPAREN", "LBRACKET", "RBRACKET", "STRING_LIT", "COMMA",
             ):
                 j += 1
+            if any(tokens[k].kind == "SEMI" for k in range(i + 1, j)):
+                continue
             if j < len(tokens) and tokens[j].kind in STMT_START and tokens[j].kind != "RBRACE":
                 if tokens[i].line != tokens[j].line:
                     diags.append(

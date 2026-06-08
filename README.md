@@ -17,28 +17,7 @@
 | 优化 | `compiler/optimizer.py` | 常量折叠、复制传播、死代码消除 |
 | 目标代码 | `compiler/codegen.py` | 生成可执行的 Python 代码 |
 
-## MiniLang 语法示例
-
-```c
-int a;
-int b;
-a = 10;
-b = 20;
-print(a + b);
-
-while (i <= n) {
-    result = result * i;
-    i = i + 1;
-}
-
-if (x > 10) {
-    y = 100;
-} else {
-    y = 0;
-}
-```
-
-## 快速开始（桌面编辑器）
+## 快速开始
 
 需要 Python 3.10+，**无需安装额外依赖**（使用内置 Tkinter）。
 
@@ -46,95 +25,52 @@ if (x > 10) {
 python -m compiler.main
 ```
 
-在编辑器里：
+在桌面编辑器中：
+
 1. 编写 MiniLang 代码（默认 `workspace/main.ml`）
-2. **编译并运行**（`F5`）— 运行时会弹窗 `input` 读入
-3. `print` 输出显示在下方，`write` 写入 `workspace/output/`
-4. **Ctrl+S** 保存，**打开输出目录** 查看生成文件
+2. **F5** 编译并运行 — `input` 会弹窗读入
+3. `print` 显示在下方，`write` 写入 `workspace/output/`
+4. **Ctrl+S** 保存
 
-支持：`int` / `float` / `string`、`input`、`print`、`write`、`string[i]` 字符访问、`len(s)` 长度、数组（栈/队列等基础结构）、函数、循环。
-
-### 语言速查（写算法常用）
-
-| 能力 | 写法 |
-|------|------|
-| 字符串读入 | `input(s, "提示: ");` |
-| 取字符 | `ch = s[i];` |
-| 长度 | `n = len(s);` |
-| 栈（数组模拟） | `int stack[256];` + `top` 指针 |
-| 字符串拼接 | `s = s + "x";` |
-| 写文件 | `write("out.txt", x);` → `workspace/output/` |
-
-括号匹配示例思路：`input` 读整串 → `while (i < len(s))` → `s[i]` 与 `(` `[` `{` 比较 → `int stack[]` 压弹栈。
-
-
-```c
-// 递归函数
-int fib(int n) {
-    if (n <= 1) {
-        return n;
-    }
-    return fib(n - 1) + fib(n - 2);
-}
-
-// 数组 + for + break
-int data[5];
-int total;
-int i;
-for (i = 0; i < 5; i = i + 1) {
-    data[i] = (i + 1) * 10;
-}
-total = 0;
-for (i = 0; i < 5; i = i + 1) {
-    total = total + data[i];
-    if (total > 100) {
-        break;
-    }
-}
-
-// 字符串与逻辑运算
-string msg;
-msg = "Hello MiniLang";
-if (score >= 60 && score <= 100) {
-    print(msg);
-}
-```
-
-### 命令行（可选）
+### 命令行
 
 ```bash
-# 编译并运行指定文件（终端内 input 从键盘读入）
+# 编译并运行
 python -m compiler.main workspace/main.ml --run
 
-# 查看完整编译过程
-python -m compiler.main examples/factorial.ml --dump all --run
+# 查看中间结果
+python -m compiler.main workspace/main.ml --dump all
+```
+
+## 语言特性
+
+`int` / `float` / `string`、函数（含递归）、`if` / `while` / `for`、`break` / `continue`、数组、`string[i]`、`len()`、`input`、`print`（支持多参数同一行输出）、`printn`（不换行）、`write`。
+
+### 一行读多个数（类似 `scanf`）
+
+```c
+input(n, x, "> ");          // 一行输入: 2 3
+input(line, "> ");          // 一行字符串: 10 20 30
+t = getint(line, 0);       // 取第 1 个数 (下标从 0)
+t = getint(line, 1);       // 取第 2 个数
 ```
 
 ## 项目结构
 
 ```
 fnbianyi/
-├── editor/gui.py            # 桌面代码编辑器（主入口）
-├── workspace/               # 用户编写代码的工作区
-│   ├── main.ml              # 默认源文件
-│   └── output/              # write() 输出目录
-├── grammar/                 # 语法规则库
-├── compiler/                # 编译器各阶段
-└── examples/                # 参考示例（可选）
+├── compiler/          # 编译器各阶段
+├── grammar/           # 词法/语法规则
+├── editor/gui.py      # 桌面 IDE（默认入口）
+└── workspace/         # 用户源码与 write 输出
+    ├── main.ml
+    └── output/
 ```
-
-> Web 版仍保留在 `web/` 目录，运行 `python -m compiler.main --web` 或 `python -m web.app`，访问 http://127.0.0.1:5000。**与桌面版同步**：空白工作区、`input`/`write`、`string[i]`、`len()`、运行输入框、保存到 `workspace/main.ml`。
 
 ## 与参考项目的对应关系
 
 | 参考项目 | 本项目 |
 |----------|--------|
-| Java DFA 词法分析 | Python 正则词法分析 + `tokens.json` 规则库 |
-| Python LL1/LR 分析器 | 递归下降语法分析 + `grammar.json` BNF 库 |
+| Java DFA 词法分析 | Python 正则词法分析 + `tokens.json` |
+| Python LL1/LR 分析器 | 递归下降 + `grammar.json` |
 | （无） | 语义分析、TAC、优化、代码生成 |
-
-## 扩展建议
-
-- 在 `grammar/tokens.json` 中添加新关键字/运算符
-- 在 `grammar/grammar.json` 中扩展产生式，并在 `parser.py` 中实现对应解析函数
-- 将目标后端改为 x86 汇编或 LLVM IR

@@ -235,14 +235,17 @@ class SemanticAnalyzer:
             if self.loop_depth == 0:
                 self._err("continue 只能出现在循环内部", stmt.line, "E320")
         elif isinstance(stmt, PrintStmt):
-            self._check_expr(stmt.value, stmt.line)
+            for part in stmt.values:
+                self._check_expr(part, stmt.line)
         elif isinstance(stmt, InputStmt):
-            sym = self.current_scope.lookup(stmt.name)
-            if not sym:
-                self._err(f"input 目标变量 '{stmt.name}' 未声明", stmt.line, "E327")
-            else:
-                sym.used = True
-                stmt.type_name = sym.type_name
+            stmt.type_names = []
+            for vname in stmt.names:
+                sym = self.current_scope.lookup(vname)
+                if not sym:
+                    self._err(f"input 目标变量 '{vname}' 未声明", stmt.line, "E327")
+                else:
+                    sym.used = True
+                    stmt.type_names.append(sym.type_name)
             if stmt.prompt:
                 self._check_expr(stmt.prompt, stmt.line)
         elif isinstance(stmt, WriteStmt):
@@ -289,6 +292,18 @@ class SemanticAnalyzer:
                     sym = self.current_scope.lookup(expr.args[0].name)
                     if sym and not sym.is_array and sym.type_name != "string":
                         self._err("len 仅支持 string 或数组", default_line, "E331")
+                expr.type_name = "int"
+                return "int"
+            if expr.name == "getint":
+                if len(expr.args) != 2:
+                    self._err("getint() 需要 2 个参数: getint(行字符串, 第几个数)", default_line, "E332")
+                    return "int"
+                lt = self._check_expr(expr.args[0], default_line)
+                if lt != "string" and lt != "unknown":
+                    self._err("getint 第 1 个参数应为 string", default_line, "E333")
+                rt = self._check_expr(expr.args[1], default_line)
+                if rt not in self.NUMERIC and rt != "unknown":
+                    self._err("getint 第 2 个参数应为整数下标", default_line, "E334")
                 expr.type_name = "int"
                 return "int"
             fn = self.functions.get(expr.name)

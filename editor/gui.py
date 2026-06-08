@@ -21,6 +21,31 @@ STATUS_ERR = "#f85149"
 STATUS_WARN = "#d29922"
 
 
+class _LiveStdout:
+    """运行时将 print 实时写入输出面板。"""
+
+    def __init__(self, widget: scrolledtext.ScrolledText, root: tk.Misc) -> None:
+        self.widget = widget
+        self.root = root
+        self._parts: list[str] = []
+
+    def write(self, text: str) -> None:
+        if not text:
+            return
+        self._parts.append(text)
+        self.widget.config(state=tk.NORMAL)
+        self.widget.insert(tk.END, text)
+        self.widget.config(state=tk.DISABLED)
+        self.widget.see(tk.END)
+        self.root.update_idletasks()
+
+    def flush(self) -> None:
+        pass
+
+    def getvalue(self) -> str:
+        return "".join(self._parts)
+
+
 class LineNumberedEditor(tk.Frame):
     """带行号栏的代码编辑器。"""
 
@@ -254,6 +279,7 @@ class MiniLangIDE(tk.Tk):
             self._set_status(f"编译失败 — {len(result.errors)} 个错误", ok=False)
 
     def _gui_input(self, prompt: str) -> str:
+        self.update_idletasks()
         val = simpledialog.askstring("程序输入", prompt or "请输入:", parent=self)
         return val or ""
 
@@ -269,27 +295,27 @@ class MiniLangIDE(tk.Tk):
         set_input_handler(self._gui_input)
         set_write_handler(self._on_write_notify)
 
-        import io
-        from compiler.compiler import Compiler as C
         from compiler.runtime import runtime_globals
 
-        buf = io.StringIO()
-        import sys
+        self._set_text(self.output_text, "")
+        live_out = _LiveStdout(self.output_text, self)
         old_out = sys.stdout
-        sys.stdout = buf
+        sys.stdout = live_out
         globs = {"__name__": "__main__"}
         globs.update(runtime_globals())
+        err = False
         try:
             exec(compile(code, "<generated>", "exec"), globs)
-            output = buf.getvalue()
         except Exception as e:
-            output = f"[运行错误] {type(e).__name__}: {e}"
+            live_out.write(f"\n[运行错误] {type(e).__name__}: {e}\n")
+            err = True
         finally:
             sys.stdout = old_out
             reset_handlers()
 
-        self._set_text(self.output_text, output or "(程序运行完毕，无 print 输出)")
-        self._set_status("运行完成")
+        if not live_out.getvalue().strip():
+            self._set_text(self.output_text, "(程序运行完毕，无 print 输出)")
+        self._set_status("运行完成" if not err else "运行出错", ok=not err)
 
     def _compile_and_run(self) -> None:
         self._save_file()
@@ -300,7 +326,6 @@ class MiniLangIDE(tk.Tk):
             return
         if self.current_file:
             self.current_file.with_suffix(".py").write_text(result.target_code, encoding="utf-8")
-        self._set_text(self.output_text, "正在运行...\n")
         self._run_compiled(result.target_code)
 
     def _run(self) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
@@ -126,11 +127,14 @@ class TACGenerator:
                 else:
                     out.append(TACInstr("assign", val, "", stmt.name))
             elif isinstance(stmt, PrintStmt):
-                val = self._gen_expr(stmt.value, out)
-                out.append(TACInstr("print", val))
+                parts = [self._gen_expr(v, out) for v in stmt.values]
+                op = "printn" if not stmt.newline else "print"
+                out.append(TACInstr(op, ",".join(parts)))
             elif isinstance(stmt, InputStmt):
                 prompt = self._gen_expr(stmt.prompt, out) if stmt.prompt else '""'
-                out.append(TACInstr("input", prompt, stmt.type_name, stmt.name))
+                types = ",".join(stmt.type_names) if stmt.type_names else "int"
+                names = ",".join(stmt.names)
+                out.append(TACInstr("input", prompt, types, names))
             elif isinstance(stmt, WriteStmt):
                 path = self._gen_expr(stmt.path, out)
                 val = self._gen_expr(stmt.value, out)
@@ -226,7 +230,7 @@ class TACGenerator:
             return temp
         if isinstance(expr, StringLit):
             temp = self._new_temp()
-            out.append(TACInstr("assign", f'"{expr.value}"', "", temp))
+            out.append(TACInstr("assign", json.dumps(expr.value, ensure_ascii=False), "", temp))
             return temp
         if isinstance(expr, VarExpr):
             return expr.name

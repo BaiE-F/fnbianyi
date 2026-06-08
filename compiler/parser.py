@@ -46,7 +46,7 @@ class Parser:
     """递归下降语法分析器，带保证前进的 panic-mode 错误恢复。"""
 
     STMT_START = frozenset({
-        "IF", "WHILE", "FOR", "PRINT", "INPUT", "WRITE",
+        "IF", "WHILE", "FOR", "PRINT", "PRINTN", "INPUT", "WRITE",
         "INT", "FLOAT", "STRING", "IDENT", "RETURN", "BREAK", "CONTINUE",
     })
     STMT_BOUNDARY = frozenset({"SEMI", "RBRACE", "EOF"})
@@ -176,7 +176,7 @@ class Parser:
         limit = len(self.tokens) + 1
         steps = 0
         while self._peek().kind in (
-            "INT", "FLOAT", "STRING", "IF", "WHILE", "FOR", "PRINT", "INPUT", "WRITE",
+            "INT", "FLOAT", "STRING", "IF", "WHILE", "FOR", "PRINT", "PRINTN", "INPUT", "WRITE",
             "IDENT", "LBRACE", "RETURN", "BREAK", "CONTINUE",
         ):
             steps += 1
@@ -201,7 +201,9 @@ class Parser:
         if tok.kind == "FOR":
             return self._parse_for()
         if tok.kind == "PRINT":
-            return self._parse_print()
+            return self._parse_print(newline=True)
+        if tok.kind == "PRINTN":
+            return self._parse_print(newline=False)
         if tok.kind == "INPUT":
             return self._parse_input()
         if tok.kind == "WRITE":
@@ -342,17 +344,23 @@ class Parser:
         line = self._advance().line
         if not self._expect("LPAREN"):
             return None
-        name_tok = self._expect("IDENT", "input 需要变量名")
-        if not name_tok:
+        names: List[str] = []
+        first = self._expect("IDENT", "input 需要至少一个变量名")
+        if not first:
             return None
+        names.append(first.value)
         prompt = None
-        if self._match("COMMA"):
-            prompt = self._parse_logic()
+        while self._match("COMMA"):
+            if self._peek().kind == "IDENT":
+                names.append(self._advance().value)
+            else:
+                prompt = self._parse_logic()
+                break
         if not self._expect("RPAREN"):
             return None
         if not self._expect("SEMI"):
             self._finish_stmt()
-        return InputStmt(name_tok.value, prompt, line)
+        return InputStmt(names, prompt, line=line)
 
     def _parse_write(self) -> Optional[WriteStmt]:
         line = self._advance().line
@@ -368,16 +376,26 @@ class Parser:
             self._finish_stmt()
         return WriteStmt(path, value, line)
 
-    def _parse_print(self) -> Optional[PrintStmt]:
+    def _parse_print(self, newline: bool = True) -> Optional[PrintStmt]:
         line = self._advance().line
         if not self._expect("LPAREN"):
             return None
-        expr = self._parse_logic()
-        if not expr or not self._expect("RPAREN"):
+        values: List[Expr] = []
+        first = self._parse_logic()
+        if not first:
+            return None
+        values.append(first)
+        while self._match("COMMA"):
+            if self._peek().kind == "RPAREN":
+                break
+            part = self._parse_logic()
+            if part:
+                values.append(part)
+        if not self._expect("RPAREN"):
             return None
         if not self._expect("SEMI"):
             self._finish_stmt()
-        return PrintStmt(expr, line)
+        return PrintStmt(values, newline, line)
 
     def _parse_block(self) -> Optional[Block]:
         if not self._expect("LBRACE"):

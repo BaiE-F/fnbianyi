@@ -6,8 +6,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from .compiler import Compiler
-from .runtime import runtime_globals
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from compiler.compiler import Compiler
+from compiler.runtime import runtime_globals
 
 
 def _print_stage(title: str) -> None:
@@ -23,7 +27,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("source", nargs="?", help="MiniLang 源文件 (.ml)")
     parser.add_argument("-o", "--output", help="输出目标代码文件路径")
     parser.add_argument("--run", action="store_true", help="编译并运行")
-    parser.add_argument("--web", action="store_true", help="启动 Web 界面")
     parser.add_argument("--gui", action="store_true", help="启动桌面代码编辑器")
     parser.add_argument("--no-opt", action="store_true", help="跳过优化阶段")
     parser.add_argument(
@@ -33,14 +36,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    if args.gui or (not args.source and not args.web):
+    if args.gui or not args.source:
         from editor.gui import main as gui_main
         gui_main()
-        return 0
-
-    if args.web:
-        from web.app import main as web_main
-        web_main()
         return 0
 
     src_path = Path(args.source)
