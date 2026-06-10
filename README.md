@@ -70,7 +70,6 @@ fnbianyi/
 ├── editor/gui.py          # 桌面 IDE（默认入口）
 ├── tests/                 # 测试
 ├── assets/                # 设计笔记与分析文档
-├── 改动词法分析版本/        # 旧版 re 词法器参考副本
 └── workspace/             # 用户源码与 write 输出
     ├── main.ml
     └── output/
